@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	Wrap         string        `yaml:"wrap"`
 	Source       string        `yaml:"source"`
 	GraphVersion string        `yaml:"graph_version"`
 	SignInTypes  []string      `yaml:"signin_types"`

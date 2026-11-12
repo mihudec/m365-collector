@@ -112,18 +112,8 @@ func PollGraph(ctx context.Context, c Config, a *API, s *State, out io.Writer, n
 				if e != nil || done {
 					return e
 				}
-				var line bytes.Buffer
-				encoder := json.NewEncoder(&line)
-				encoder.SetEscapeHTML(false)
-				if e = encoder.Encode(event); e != nil {
-					return e
-				}
-				n, e := out.Write(line.Bytes())
-				if e != nil {
+				if e = writeEvent(out, event, c.Wrap); e != nil {
 					return fmt.Errorf("write sign-in: %w", e)
-				}
-				if n != line.Len() {
-					return io.ErrShortWrite
 				}
 				return s.mark(key, id, now)
 			})

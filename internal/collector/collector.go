@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -45,12 +44,11 @@ func Poll(ctx context.Context, c Config, a *API, s *State, out io.Writer, now ti
 				if e != nil {
 					return e
 				}
-				encoder := json.NewEncoder(out)
 				for _, event := range events {
 					if e = ctx.Err(); e != nil {
 						return e
 					}
-					if e = encoder.Encode(event); e != nil {
+					if e = writeEvent(out, event, c.Wrap); e != nil {
 						return fmt.Errorf("write event: %w", e)
 					}
 				}

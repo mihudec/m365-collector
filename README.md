@@ -64,12 +64,31 @@ scheduled:
 
 Choose an interval long enough for a complete poll: Vector kills scheduled commands exceeding this time. Keep `include_stderr: false`, JSON decoding, and newline framing. The example raises both input buffer and frame limits to accommodate large events. Monitor process failures through Vector/service logs. Attach your normal transforms and sinks to the `m365` source.
 
+## Separate source events from Vector metadata
+
+Set `wrap: entra` in the collector YAML, or pass `--wrap entra` to `collect` or `run`:
+
+```sh
+m365-collector --config config.yaml run --wrap entra
+```
+
+An original event `{"id":"example","status":{"errorCode":0}}` is emitted as:
+
+```json
+{"entra":{"id":"example","status":{"errorCode":0}}}
+```
+
+Vector can then add its own root metadata while the original payload stays under `.entra`. Update `entra.vrl` references accordingly, for example `.entra.userPrincipalName` and `.entra.status.errorCode`. The same option works for Activity API events.
+
+Wrapping is disabled by default. The CLI overrides YAML; `--wrap=""` explicitly disables a configured wrapper. The key is literal (`entra.raw` is one key, not a nested path). Choose a key that does not conflict with Vector metadata keys. Changing wrapping does not reset checkpoints or replay previously emitted events. Restart the collector after changing its YAML configuration.
+
 ## Configuration
 
 Precedence is flags > environment > YAML > defaults. `--config` selects a YAML file; without it, defaults and environment are used. Unknown YAML keys and multiple documents are rejected. Relative paths resolve from the working directory. Secrets are deliberately unavailable as CLI flags or plaintext YAML keys.
 
 | YAML | Environment | Flag/default |
 | --- | --- | --- |
+| `wrap` | — | `--wrap`, empty (disabled) |
 | `source` | `M365_SOURCE` | `--source`, `activity` (example selects `graph`) |
 | `graph_version` | — | `--graph-version`, `v1.0`; opt-in `beta` |
 | `signin_types` | — | `--signin-types`, `interactiveUser` |

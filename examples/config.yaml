@@ -1,4 +1,6 @@
 source: graph
+# Optional: keep the original payload separate from Vector metadata.
+# wrap: entra
 graph_version: v1.0
 signin_types:
   - interactiveUser

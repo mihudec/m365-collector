@@ -23,7 +23,7 @@ func command() *cobra.Command {
 	for _, name := range []string{"collect", "run", "subscribe"} {
 		name := name
 		defaults := collector.Defaults()
-		var tenant, client, state, source, graphVersion string
+		var tenant, client, state, source, graphVersion, wrap string
 		var signInTypes []string
 		var types []string
 		var lookback, overlap, lag, interval, timeout time.Duration
@@ -33,6 +33,9 @@ func command() *cobra.Command {
 				return e
 			}
 			f := cmd.Flags()
+			if f.Changed("wrap") {
+				c.Wrap = wrap
+			}
 			if f.Changed("source") {
 				c.Source = source
 			}
@@ -105,6 +108,7 @@ func command() *cobra.Command {
 			}
 		}}
 		f := cmd.Flags()
+		f.StringVar(&wrap, "wrap", "", "Wrap each event in an object under this literal key (empty disables)")
 		f.StringVar(&source, "source", defaults.Source, "Source: activity or graph")
 		f.StringVar(&graphVersion, "graph-version", defaults.GraphVersion, "Graph API version: v1.0 or beta (opt-in)")
 		f.StringSliceVar(&signInTypes, "signin-types", defaults.SignInTypes, "Graph sign-in categories (additional categories require beta)")
