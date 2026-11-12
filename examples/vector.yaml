@@ -1,0 +1,22 @@
+sources:
+  m365:
+    type: exec
+    mode: streaming
+    command:
+      - /usr/local/bin/m365-collector
+      - --config
+      - /etc/m365-collector/config.yaml
+      - run
+    include_stderr: false
+    maximum_buffer_size_bytes: 67108864
+    streaming:
+      respawn_on_exit: true
+      respawn_interval_secs: 30
+    framing:
+      method: newline_delimited
+      newline_delimited:
+        max_length: 67108864
+    decoding:
+      codec: json
+# Supply M365_CLIENT_SECRET to Vector's service environment, or use age files.
+# Connect your normal transforms/sinks to the m365 source.

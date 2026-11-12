@@ -1,0 +1,41 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make check
+      - name: Build
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: make build
+      - name: Package
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/release
+          for os in linux macos; do
+            for arch in amd64 arm64; do
+              tar -czf "dist/release/m365-collector_${VERSION}_${os}_${arch}.tar.gz" -C "dist/$os/$arch" m365-collector -C "$GITHUB_WORKSPACE" README.md examples
+            done
+          done
+          cd dist/release
+          sha256sum *.tar.gz > checksums.txt
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: gh release create "$VERSION" dist/release/* --verify-tag --generate-notes

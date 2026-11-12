@@ -1,0 +1,8 @@
+/dist/
+/state/
+*.db*
+*.age
+*.key
+.env
+config.yaml
+coverage.out
