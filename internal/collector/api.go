@@ -17,12 +17,13 @@ import (
 type API struct {
 	client                                  *http.Client
 	base, tokenURL, clientID, secret, token string
+	oauthScope                              string
 	expires                                 time.Time
 	publisher                               string
 }
 
 func NewAPI(c Config, secret string) *API {
-	return &API{client: &http.Client{Timeout: c.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, base: "https://manage.office.com/api/v1.0/" + c.TenantID + "/activity/feed/", tokenURL: "https://login.microsoftonline.com/" + c.TenantID + "/oauth2/v2.0/token", clientID: c.ClientID, secret: secret, publisher: c.TenantID}
+	return &API{client: &http.Client{Timeout: c.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, base: "https://manage.office.com/api/v1.0/" + c.TenantID + "/activity/feed/", tokenURL: "https://login.microsoftonline.com/" + c.TenantID + "/oauth2/v2.0/token", clientID: c.ClientID, secret: secret, publisher: c.TenantID, oauthScope: "https://manage.office.com/.default"}
 }
 func wait(ctx context.Context, d time.Duration) error {
 	t := time.NewTimer(d)
@@ -38,7 +39,7 @@ func (a *API) authenticate(ctx context.Context) error {
 	if a.token != "" && time.Now().Before(a.expires) {
 		return nil
 	}
-	form := url.Values{"client_id": {a.clientID}, "client_secret": {a.secret}, "grant_type": {"client_credentials"}, "scope": {"https://manage.office.com/.default"}}
+	form := url.Values{"client_id": {a.clientID}, "client_secret": {a.secret}, "grant_type": {"client_credentials"}, "scope": {a.oauthScope}}
 	b, _, err := a.request(ctx, http.MethodPost, a.tokenURL, []byte(form.Encode()), false)
 	if err != nil {
 		return err

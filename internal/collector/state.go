@@ -86,6 +86,6 @@ func (s *State) mark(key, id string, t time.Time) error {
 	return e
 }
 func (s *State) prune(now time.Time) error {
-	_, e := s.db.Exec("DELETE FROM completed WHERE stamp < ?", now.Add(-8*24*time.Hour).Unix())
+	_, e := s.db.Exec("DELETE FROM completed WHERE stamp < ?", now.Add(-31*24*time.Hour).Unix())
 	return e
 }

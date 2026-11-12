@@ -13,6 +13,9 @@ import (
 )
 
 type Config struct {
+	Source       string        `yaml:"source"`
+	GraphVersion string        `yaml:"graph_version"`
+	SignInTypes  []string      `yaml:"signin_types"`
 	TenantID     string        `yaml:"tenant_id"`
 	ClientID     string        `yaml:"client_id"`
 	ClientSecret string        `yaml:"-"`
@@ -28,7 +31,7 @@ type Config struct {
 }
 
 func Defaults() Config {
-	return Config{StatePath: "state/collector.db", ContentTypes: []string{"Audit.AzureActiveDirectory", "Audit.Exchange", "Audit.SharePoint", "Audit.General"}, Lookback: 24 * time.Hour, Overlap: time.Hour, Lag: 5 * time.Minute, Interval: 5 * time.Minute, Timeout: 60 * time.Second}
+	return Config{Source: "activity", GraphVersion: "v1.0", SignInTypes: []string{"interactiveUser"}, StatePath: "state/collector.db", ContentTypes: []string{"Audit.AzureActiveDirectory", "Audit.Exchange", "Audit.SharePoint", "Audit.General"}, Lookback: 24 * time.Hour, Overlap: time.Hour, Lag: 5 * time.Minute, Interval: 5 * time.Minute, Timeout: 60 * time.Second}
 }
 
 func Load(path string) (Config, error) {
@@ -49,7 +52,7 @@ func Load(path string) (Config, error) {
 			return c, errors.New("config must contain one YAML document")
 		}
 	}
-	for key, dst := range map[string]*string{"TENANT_ID": &c.TenantID, "CLIENT_ID": &c.ClientID, "CLIENT_SECRET": &c.ClientSecret, "SECRET_FILE": &c.SecretFile, "AGE_IDENTITY_FILE": &c.IdentityFile, "STATE_PATH": &c.StatePath} {
+	for key, dst := range map[string]*string{"SOURCE": &c.Source, "TENANT_ID": &c.TenantID, "CLIENT_ID": &c.ClientID, "CLIENT_SECRET": &c.ClientSecret, "SECRET_FILE": &c.SecretFile, "AGE_IDENTITY_FILE": &c.IdentityFile, "STATE_PATH": &c.StatePath} {
 		if v, ok := os.LookupEnv("M365_" + key); ok {
 			*dst = v
 		}
@@ -71,8 +74,36 @@ func (c Config) Validate() error {
 			}
 		}
 	}
-	if c.StatePath == "" || c.Timeout <= 0 || c.Interval <= 0 || c.Lookback <= 0 || c.Lookback > 6*24*time.Hour || c.Overlap < 0 || c.Overlap > 24*time.Hour || c.Lag < 0 || c.Lag > 24*time.Hour {
-		return errors.New("invalid state path or durations (lookback <= 144h, overlap/lag <= 24h)")
+	if c.Source != "activity" && c.Source != "graph" {
+		return errors.New("source must be activity or graph")
+	}
+	maxLookback := 6 * 24 * time.Hour
+	if c.Source == "graph" {
+		maxLookback = 29 * 24 * time.Hour
+	}
+	if c.GraphVersion != "v1.0" && c.GraphVersion != "beta" {
+		return errors.New("graph_version must be v1.0 or beta")
+	}
+	if len(c.SignInTypes) == 0 {
+		return errors.New("signin_types must not be empty")
+	}
+	signTypes := map[string]bool{}
+	for _, kind := range c.SignInTypes {
+		switch kind {
+		case "interactiveUser", "nonInteractiveUser", "servicePrincipal", "managedIdentity":
+		default:
+			return fmt.Errorf("unsupported sign-in type %q", kind)
+		}
+		if signTypes[kind] {
+			return errors.New("duplicate sign-in type")
+		}
+		signTypes[kind] = true
+		if c.Source == "graph" && c.GraphVersion == "v1.0" && kind != "interactiveUser" {
+			return errors.New("non-interactive and workload sign-ins require graph_version: beta")
+		}
+	}
+	if c.StatePath == "" || c.Timeout <= 0 || c.Interval <= 0 || c.Lookback <= 0 || c.Lookback > maxLookback || c.Overlap < 0 || c.Overlap > 24*time.Hour || c.Lag < 0 || c.Lag > 24*time.Hour {
+		return fmt.Errorf("invalid state path or durations (lookback <= %s, overlap/lag <= 24h)", maxLookback)
 	}
 	if len(c.ContentTypes) == 0 {
 		return errors.New("content_types must not be empty")
@@ -104,8 +135,8 @@ func (c Config) Secret() (string, error) {
 	}
 	defer identity.Close()
 	ids, e := age.ParseIdentities(identity)
-	if e != nil {
-		return "", errors.New("invalid age identity file")
+	if e != nil || len(ids) == 0 {
+		return "", errors.New("invalid age identity file: expected a native X25519 or hybrid post-quantum age identity")
 	}
 	f, e := os.Open(c.SecretFile)
 	if e != nil {

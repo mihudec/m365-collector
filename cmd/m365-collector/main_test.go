@@ -27,3 +27,14 @@ func TestInvalidConfiguration(t *testing.T) {
 		t.Fatalf("expected validation error: %v", e)
 	}
 }
+
+func TestGraphSubscribeNeedsNoCredentials(t *testing.T) {
+	t.Setenv("M365_SOURCE", "activity")
+	t.Setenv("M365_TENANT_ID", "11111111-1111-1111-1111-111111111111")
+	t.Setenv("M365_CLIENT_ID", "22222222-2222-2222-2222-222222222222")
+	cmd := command()
+	cmd.SetArgs([]string{"subscribe", "--source", "graph"})
+	if e := cmd.Execute(); e == nil || !strings.Contains(e.Error(), "does not require subscriptions") {
+		t.Fatal(e)
+	}
+}

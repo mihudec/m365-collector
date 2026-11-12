@@ -23,7 +23,8 @@ func command() *cobra.Command {
 	for _, name := range []string{"collect", "run", "subscribe"} {
 		name := name
 		defaults := collector.Defaults()
-		var tenant, client, state string
+		var tenant, client, state, source, graphVersion string
+		var signInTypes []string
 		var types []string
 		var lookback, overlap, lag, interval, timeout time.Duration
 		cmd := &cobra.Command{Use: name, Args: cobra.NoArgs, Short: map[string]string{"collect": "Poll once and exit (Vector scheduled exec)", "run": "Poll continuously (Vector streaming exec)", "subscribe": "Enable configured Activity API subscriptions"}[name], RunE: func(cmd *cobra.Command, _ []string) error {
@@ -32,6 +33,15 @@ func command() *cobra.Command {
 				return e
 			}
 			f := cmd.Flags()
+			if f.Changed("source") {
+				c.Source = source
+			}
+			if f.Changed("graph-version") {
+				c.GraphVersion = graphVersion
+			}
+			if f.Changed("signin-types") {
+				c.SignInTypes = signInTypes
+			}
 			if f.Changed("tenant-id") {
 				c.TenantID = tenant
 			}
@@ -55,11 +65,17 @@ func command() *cobra.Command {
 			if e = c.Validate(); e != nil {
 				return e
 			}
+			if name == "subscribe" && c.Source == "graph" {
+				return fmt.Errorf("Graph sign-in collection does not require subscriptions; use collect or run")
+			}
 			secret, e := c.Secret()
 			if e != nil {
 				return e
 			}
 			a := collector.NewAPI(c, secret)
+			if c.Source == "graph" {
+				a = collector.NewGraphAPI(c, secret)
+			}
 			if name == "subscribe" {
 				return a.Subscribe(cmd.Context(), c.ContentTypes)
 			}
@@ -69,7 +85,11 @@ func command() *cobra.Command {
 			}
 			defer s.Close()
 			for {
-				if e = collector.Poll(cmd.Context(), c, a, s, cmd.OutOrStdout(), time.Now()); e != nil {
+				poll := collector.Poll
+				if c.Source == "graph" {
+					poll = collector.PollGraph
+				}
+				if e = poll(cmd.Context(), c, a, s, cmd.OutOrStdout(), time.Now()); e != nil {
 					return e
 				}
 				if name == "collect" {
@@ -85,6 +105,9 @@ func command() *cobra.Command {
 			}
 		}}
 		f := cmd.Flags()
+		f.StringVar(&source, "source", defaults.Source, "Source: activity or graph")
+		f.StringVar(&graphVersion, "graph-version", defaults.GraphVersion, "Graph API version: v1.0 or beta (opt-in)")
+		f.StringSliceVar(&signInTypes, "signin-types", defaults.SignInTypes, "Graph sign-in categories (additional categories require beta)")
 		f.StringVar(&tenant, "tenant-id", "", "Tenant UUID")
 		f.StringVar(&client, "client-id", "", "Application UUID")
 		f.StringVar(&state, "state-path", defaults.StatePath, "SQLite checkpoint path")

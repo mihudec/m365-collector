@@ -4,5 +4,5 @@
 *.age
 *.key
 .env
-config.yaml
+/config.yaml
 coverage.out
